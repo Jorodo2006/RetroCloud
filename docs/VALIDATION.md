@@ -1,58 +1,62 @@
-# Validación de la fase 1
+# Validación del almacenamiento autohospedado
 
 Fecha: 7 de octubre de 2026 (Europe/Madrid).
 
-## Entorno comprobado
+## Entorno
 
-- Windows, Node.js 24.14.0 y npm 11.9.0.
-- Docker Desktop con motor Linux y Docker Compose 5.3.0.
-- MySQL 8.4 y Azurite 3.37.0.
-- Lockfile generado desde manifiestos limpios con npm 11.21.0;
-  instalación reproducida con npm ci 11.9.0 en Windows y en Docker.
+Windows con Node.js 24.14.0, npm 11.9.0 y Docker Desktop con contenedores Linux.
+MySQL 8.4, API con usuario node y volumen local storage-data.
+Lockfile generado desde manifiestos limpios con npm 11.21.0 y reproducido mediante npm ci.
 
 ## Resultados
 
 | Comprobación | Resultado |
 | --- | --- |
-| Instalación limpia desde package-lock.json | Correcta en Windows y en la imagen Linux |
-| Validación del esquema Prisma | Correcta |
-| Generación y compilación TypeScript estricta | Correctas en Windows y Docker |
-| Pruebas unitarias de configuración y HTTP | 15/15 en Windows y Docker |
-| Pruebas de integración MySQL/Azurite | 7/7 en Windows y Docker |
-| Dos migraciones sobre MySQL inicialmente vacío | Aplicadas correctamente |
-| Repetición de migrate deploy | Sin migraciones pendientes |
-| Comparación de la base con el esquema Prisma | Sin diferencias |
-| Contenedores de API, MySQL y Azurite | Healthy |
-| Contenedores migrate y storage-init | Exited (0) |
-| GET /health/live | HTTP 200, status ok |
-| GET /health/ready | HTTP 200, database y storage true |
-| npm audit | 0 vulnerabilidades reportadas al validar |
-| Exclusión de secretos y artefactos generados en Git | .env, node_modules, .tmp y cliente Prisma ignorados |
+| Instalación limpia y compilación de la imagen | Correctas |
+| Validación Prisma y TypeScript estricto | Correctas en Windows y Docker |
+| Pruebas unitarias de configuración, HTTP y disco | 33/33 en Windows y Docker |
+| Pruebas de integración MySQL/almacenamiento local | 7/7 en Windows y Docker |
+| Migración 003 sobre la base existente | Aplicada correctamente, tres migraciones al día |
+| Comparación de MySQL con el esquema Prisma | Sin diferencias |
+| Escritura, reinicio real de la API y lectura del mismo archivo | Contenido conservado; fixture eliminado |
+| Readiness después del reinicio | HTTP 200, database y storage true |
+| Inicializadores migrate y storage-init | Exited (0) |
+| npm audit | 0 vulnerabilidades reportadas |
+| Paquetes @azure en el lockfile | 0 |
+| Contenedor Azurite | Retirado; volumen anterior conservado |
 
-La integración comprueba unicidad de fingerprints y biblioteca, identificadores de sesión
-idempotentes, propiedad de dispositivos y saves, fechas inválidas, ramas de versiones,
-reintentos de subida, padres de otra partida, versiones positivas y checksums.
-También sube un blob sintético, comprueba su contenido y verifica que una lectura anónima falla.
-Los fixtures se eliminan al terminar; no se han utilizado ROMs ni partidas reales.
+Antes de sustituir Azurite se comprobó que no había versiones de saves en MySQL ni archivos
+en sus contenedores saves/captures. No fue necesaria una transferencia de partidas reales.
+La columna y el índice se renombraron mediante una nueva migración; el historial SQL anterior
+se conserva sin cambios.
 
-## Repetir comprobaciones
+## Qué cubren las pruebas
 
-Con el entorno iniciado según el README:
+- Rechazo de rutas relativas/absolutas, traversal, separadores alternativos y nombres no válidos.
+- Rechazo de symlinks y junctions en categorías y en la raíz.
+- Escrituras completas, ausencia de sobrescritura y competencia entre dos escritores.
+- Persistencia entre instancias del adaptador y limpieza de probes.
+- Healthchecks, errores HTTP y rechazo de descargas por rutas estáticas.
+- Unicidad, pertenencia de sesiones/saves, ramas, padres de otra partida y checksums SQL.
+
+Los archivos utilizados son sintéticos; no se han utilizado ROMs ni saves del usuario.
+
+## Repetir
+
+Con MySQL iniciado según el README:
 
 ```powershell
 npm run check
+npm run storage:init
 npm run test:integration
 npm run db:status
 npm run db:diff
 npm audit
 ```
 
-También se han ejecutado check e integración en un contenedor temporal de la imagen final.
-La comparación de Prisma no representa los CHECK SQL adicionales; las pruebas de integración
-verifican sus restricciones críticas.
+## Límites
 
-## Alcance no probado todavía
-
-No hay lógica de identificación de ROMs, cola offline, sincronización, restauración o resolución
-de conflictos. Sus pruebas llegarán con las fases correspondientes.
-No se ha inspeccionado Retro Machine, que está en otro PC, ni se ha desplegado nada en Azure.
+No están implementados autenticación, cola offline, sincronización ni resolución de conflictos.
+No se ha inspeccionado Retro Machine, que está en otro PC.
+No se ha realizado un simulacro completo de backup/restauración; queda para el despliegue local.
+La comparación Prisma no representa los CHECK SQL adicionales, que se verifican mediante tests.

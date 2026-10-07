@@ -1,125 +1,116 @@
 # Arquitectura de Retro Cloud
 
-## Alcance y decisiones
+## Decisiones aprobadas
 
-- Fase 1: estructura, API base, MySQL y Azure Blob mediante Azurite en local.
-- Desarrollo/pruebas en Windows con contenedores Linux de Docker Desktop.
-- Node 24, TypeScript estricto, npm workspaces, Express 5, Zod y logs JSON con Pino.
+- Runtime autohospedado: Node.js, MySQL y almacenamiento local en el equipo del usuario.
+- Desarrollo y pruebas en Windows; Docker utiliza contenedores Linux.
+- Node 24, TypeScript estricto, npm workspaces, Express 5, Zod y Pino.
 - Prisma 7 con adaptador MariaDB para MySQL; migraciones SQL versionadas.
-- API y herramientas comparten configuración validada, sin secretos en el repositorio.
-- El Dockerfile es de desarrollo; conserva herramientas de migración/pruebas.
-- No se implementan todavía auth, escaneo, sincronización, portal ni logros.
+- Almacenamiento con las APIs de archivos de Node, sin SDK cloud ni servidor de objetos.
+- Metadatos externos y RetroAchievements serán opcionales; no están implementados todavía.
+- La instalación inicial descarga paquetes e imágenes. El funcionamiento básico no depende de Internet.
 
-## Integración pendiente con Retro Machine
+## Integración con Retro Machine pendiente
 
-El código existente está en otro PC. No se ha verificado dónde se ejecuta la emulación.
-`agent/` permanece sin lógica hasta poder inspeccionarlo.
+El código está en otro PC y aún no se ha verificado dónde se ejecuta la emulación.
+`agent/` permanece sin lógica. Si la emulación es nativa se estudiarán procesos y carpetas;
+si está en el navegador se integrarán eventos y almacenamiento del emulador.
+El esquema de nube no contiene rutas locales ni ROMs. Un dispositivo representa una instalación
+registrada; no se incrustarán claves de servidor en frontends públicos.
 
-Si es nativa, el adaptador podrá detectar procesos y vigilar carpetas autorizadas.
-Si es de navegador, será necesaria integración con eventos y almacenamiento del emulador.
-No se presupone que un navegador permita escanear carpetas o detectar procesos libremente.
-
-El identificador de dispositivo describe una instalación registrada; su mecanismo de
-registro se definirá en la fase 2. No se incrustarán API keys de servidor en un frontend público.
-El modelo de nube no almacena rutas locales ni binarios ROM.
-
-## Componentes
+## Componentes y alcance
 
 ```mermaid
 flowchart LR
   RM["Retro Machine · integración pendiente"] -.-> API["API Express"]
-  WEB["Portal React · fase 6"] -.-> API
-  API --> DB[("MySQL")]
-  API --> BLOB[("Azure Blob / Azurite")]
-  MIG["Migración explícita"] --> DB
-  INIT["Inicialización de contenedores privados"] --> BLOB
+  WEB["Portal · fase 6"] -.-> API
+  API --> DB[("MySQL local")]
+  API --> FILES[("Volumen local: saves y capturas")]
+  MIG["Migraciones explícitas"] --> DB
 ```
 
-- `api/`: aplicación HTTP, configuración e infraestructura.
-- `packages/shared/`: contratos Zod compartidos, sin Prisma ni secretos.
-- `agent/`: futuro adaptador y cola offline.
-- `web/`: futuro portal React + Vite.
-- `db/`: esquema y migraciones SQL.
+- `api/`: HTTP, configuración, base de datos y adaptador de disco.
+- `packages/shared/`: contratos Zod sin secretos ni Prisma.
+- `agent/` y `web/`: workspaces reservados.
+- `db/`: esquema y migraciones.
 - `scripts/`: generación de entorno e inicialización de almacenamiento.
-- `tests/`: pruebas unitarias y contra infraestructura real.
+- `tests/`: validación unitaria y contra infraestructura real.
 
-La API solo expone `GET /health/live` y `GET /health/ready`.
-Liveness comprueba el proceso; readiness consulta MySQL y ambos contenedores privados.
-Los errores devuelven código, mensaje genérico e identificador de petición.
-La configuración incorrecta informa del nombre de la variable, nunca de su valor.
+Solo existen `GET /health/live` y `GET /health/ready`. Readiness consulta MySQL y comprueba
+escritura/lectura/borrado de un archivo sintético en cada carpeta. Los probes se eliminan.
+Las respuestas de error no muestran detalles internos. Los logs JSON llevan un identificador
+de petición y no incluyen cuerpos, cabeceras de autenticación ni URLs de conexión.
 
 ## Modelo de datos
 
-| Tablas | Propósito y restricciones |
+| Tablas | Propósito |
 | --- | --- |
-| users | Email único, hash de contraseña; aún sin endpoints de registro. |
-| devices, device_api_keys | Propiedad, revocación y rotación de claves. Solo se almacenará SHA-256 de claves aleatorias; contraseñas requerirán hashing adaptativo en fase 2. |
-| consoles, games | Juego canónico, consola, título y metadatos normalizados. |
-| game_files | Revisión/archivo identificado por algoritmo, hash y tamaño; sin ROM, ruta ni nombre local. |
-| library_entries | Presencia de un archivo en un dispositivo; pareja única y baja lógica. |
-| play_sessions | Identificador generado por el cliente, fechas y duración; reenvíos identificables sin duplicar filas. |
+| users | Email único y hash de contraseña; autenticación pendiente. |
+| devices, device_api_keys | Propiedad, revocación y rotación. Solo hashes de claves aleatorias. |
+| consoles, games | Juego canónico, consola, título y metadatos. |
+| game_files | Hash, algoritmo, tamaño y revisión; nunca binarios ROM ni rutas. |
+| library_entries | Presencia por archivo/dispositivo, con baja lógica y unicidad. |
+| play_sessions | Identificador del cliente, inicio, fin y duración. |
 | save_files | Partida lógica por usuario, juego, tipo, slot y formato. |
-| save_versions | Versiones numeradas, padre, origen, checksum SHA-256, tamaño y clave de blob única. |
-| game_external_ids | IDs por proveedor; admite varias referencias por juego. |
-| metadata_cache | JSON cacheado por proveedor/clave, con caducidad. |
-| achievement_accounts | Vinculación futura de usuario/proveedor; sin tokens. |
-| achievements, user_achievements | Catálogo por juego externo y desbloqueos softcore/hardcore. |
+| save_versions | Versión, padre, origen, SHA-256, tamaño y storage_key. |
+| game_external_ids, metadata_cache | Referencias y caché futura de proveedores opcionales. |
+| achievement_accounts | Vinculación opcional; aún sin tokens ni llamadas externas. |
+| achievements, user_achievements | Catálogo y desbloqueos softcore/hardcore. |
 
-Se usan UUID generables offline y fechas UTC con precisión de milisegundos.
-Los tamaños son BIGINT sin signo; una futura API deberá serializarlos como cadenas decimales.
-Las duraciones son segundos activos no negativos; las sesiones abiertas tienen fin y duración nulos.
-Los hashes se almacenan como hexadecimal en minúsculas; el algoritmo forma parte de su identidad.
-CRC32/MD5/SHA1 se reservan para compatibilidad de proveedores: no sustituyen al SHA-256 de integridad.
-Los hashes específicos de RetroAchievements pueden requerir normalización por consola; no se
-asume que equivalgan al MD5 del archivo completo.
+UUID generables offline y fechas UTC con precisión de milisegundos. Los tamaños BIGINT se
+serializarán como cadenas decimales en futuros endpoints. Los hashes son hexadecimales en
+minúsculas. Los hashes de RetroAchievements pueden requerir normalización específica;
+no se supone que sean el MD5 del archivo completo.
 
-## Integridad e idempotencia
+Las claves foráneas compuestas impiden asociar sesiones/versiones a dispositivos de otro usuario,
+y exigen que padre e hijo pertenezcan a la misma partida.
+Las claves únicas de sesión/operación permitirán identificar reintentos.
+CHECK SQL comprueban hashes, versiones positivas e intervalos de sesión.
+Revocar un dispositivo conservará su historial; el borrado de cuenta se diseñará después.
 
-- Las claves foráneas compuestas obligan a que usuario y dispositivo de sesiones/versiones coincidan.
-- Las versiones pertenecen a la misma persona que la partida lógica.
-- Un padre de versión debe pertenecer a la misma partida; no puede ser la propia versión.
-- Unicidad de `(device_id, client_session_id)` y `(device_id, client_operation_id)`.
-- Unicidad de `(save_file_id, version)`; la asignación concurrente se resolverá en fase 5.
-- CHECK SQL adicionales para hashes, tiempos de sesión y versiones positivas.
-- Las relaciones de datos de juego y partidas usan RESTRICT para evitar borrados accidentales.
-  Revocar un dispositivo conserva su historial. Borrado/exportación de cuenta queda pendiente.
+## Almacenamiento local
 
-Las restricciones permiten detectar reintentos, pero los endpoints idempotentes y su respuesta
-ante payloads distintos con el mismo identificador todavía no están implementados.
+`STORAGE_ROOT` es una ruta absoluta. Compose la fija a `/data/storage` y monta el volumen
+`storage-data`. Windows usa su propia ruta de `.env`; son almacenes separados.
 
-## Saves y conflictos — diseño, no funcionalidad implementada
+El adaptador ofrece initialize, put, read, remove y check. Solo acepta claves de las formas
+`saves/<uuid>` y `captures/<uuid>`, rechazando recorridos de directorios, rutas absolutas,
+separadores alternativos y nombres especiales de Windows.
 
-Se separan partida y versiones. `format_key` evitará mezclar estados incompatibles entre emuladores,
-cores o revisiones; su contenido concreto depende de la inspección de Retro Machine.
+Las escrituras usan un archivo temporal exclusivo, sincronizan su contenido y publican
+mediante un enlace duro atómico que falla si la clave ya existe. Así una lectura no observa
+una escritura parcial y dos escritores no sobrescriben la misma versión.
+Se requiere un sistema de archivos con enlaces duros: el volumen Linux de Docker y NTFS
+están cubiertos por las pruebas locales. No se ha validado FAT, unidades de red ni carpetas sincronizadas.
 
-Una versión conserva su padre. Dos dispositivos que partan del mismo padre podrán producir ramas
-distintas sin sobrescribir sus blobs. En fase 5 se implementarán subida al cerrar juego,
-transacciones, detección explícita de conflictos y restauración como nueva versión.
-El número de versión no implica que una rama sea la elegida por el usuario.
-No existe aún una política de resolución, selección de cabeza ni limpieza de blobs huérfanos.
+Se rechazan enlaces simbólicos/junctions en la raíz, carpetas de categoría y archivos leídos/borrados.
+La raíz debe ser de uso exclusivo de la API: no se promete protección frente a un usuario local
+con permisos para modificar simultáneamente sus directorios o acceder directamente a los archivos.
+En Linux se crean directorios 0700 y archivos 0600; en Windows prevalecen las ACL de la cuenta.
+No hay servicio HTTP estático ni endpoint de descarga.
 
-Se guarda `blob_key`, nunca una URL pública o SAS persistida.
-Azurite contiene dos contenedores privados: saves y captures.
-La fase 1 no acepta subidas de archivos. Los futuros endpoints deberán autenticar al propietario
-y validar tipo, tamaño y checksum. Capturas tienen contenedor reservado; su tabla/API queda pendiente.
+MySQL almacena una clave lógica, no una ruta absoluta. La migración 003 renombra columna e índice,
+conservando registros. Las migraciones anteriores permanecen intactas.
+Antes del cambio se comprobó que el backend anterior tenía cero archivos y cero versiones;
+no hubo archivos reales que trasladar. El volumen antiguo se conserva pero no participa en Compose.
 
-## Configuración y ejecución
+## Versiones y conflictos — fases futuras
 
-`.env.example` contiene marcadores documentados. `env:init` genera secretos aleatorios en `.env`.
-La imagen no copia `.env`; Compose proporciona variables en ejecución.
-El usuario MySQL de aplicación solo tiene acceso a su base.
-Prisma CLI recibe `DATABASE_URL`; generar cliente y compilar no exige base disponible.
+Los saves se separan de sus versiones. `format_key` evitará mezclar estados incompatibles.
+Un padre permite representar ramas de dos dispositivos sin sobrescribir archivos.
+En fase 5 se implementarán asignación de versiones en transacción, subida al cerrar el juego,
+resolución explícita de conflictos, restauración como nueva versión y limpieza de archivos huérfanos.
+La atomicidad de un archivo no sustituye a una transacción entre disco y MySQL.
+Aún no hay endpoints idempotentes, política de selección de rama ni transferencias del agente.
 
-Compose espera primero la salud de MySQL/Azurite. `migrate` aplica únicamente migraciones pendientes
-y `storage-init` crea/configura los contenedores privados. La API espera la salida correcta de ambos.
-Las inicializaciones son repetibles. La API no aplica migraciones durante su arranque.
-Volúmenes nombrados conservan los datos al parar/recrear contenedores.
-Los puertos publicados solo escuchan en loopback.
+## Ejecución, persistencia y despliegue
 
-Este entorno usa HTTP local y MySQL sin TLS. No se desplegará tal cual en Azure:
-faltan TLS de base de datos, autenticación, secretos gestionados y endurecimiento de producción.
+El inicializador de almacenamiento y la API comparten volumen y usuario node.
+La imagen prepara directorios con el propietario adecuado antes de montar un volumen nuevo.
+`migrate` espera a MySQL; la API espera a migrate y storage-init.
+Los inicializadores son repetibles. `.env`, archivos y backups no entran en la imagen ni en Git.
+Los volúmenes sobreviven a recreaciones y a `docker compose down`.
 
-## Fuentes técnicas
-
-- [Prisma 7: configuración, generación y adaptadores](https://docs.prisma.io/docs/guides/upgrade-prisma-orm/v7).
-- [Azurite: configuración, cuentas y contenedores](https://github.com/Azure/Azurite/blob/main/README.md).
+Se guardarán MySQL y archivos conjuntamente con la API detenida; ver [BACKUPS.md](BACKUPS.md).
+El despliegue final será en el equipo del usuario. TLS, autenticación, acceso desde LAN,
+automatización de backups y CI opcional quedan para sus fases.
