@@ -1,3 +1,7 @@
+import request from 'supertest';
+import { createApp } from '../../api/src/app.js';
+import { createLogger } from '../../api/src/logger.js';
+import { createStorageKey } from '../../api/src/local-storage.js';
 import 'dotenv/config';
 import { randomUUID, createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -49,7 +53,7 @@ function versionData(version: number) {
   fixtureVersionIds.push(id);
   return {
     id, version, saveFileId: ids.save, userId: ids.user, deviceId: ids.device,
-    clientOperationId: randomUUID(), blobKey: 'integration/' + id, checksum, sizeBytes: 128n, capturedAt: new Date(),
+    clientOperationId: randomUUID(), storageKey: 'integration/' + id, checksum, sizeBytes: 128n, capturedAt: new Date(),
   };
 }
 
@@ -103,22 +107,22 @@ describe('MySQL constraints on the migrated schema', () => {
   });
 });
 
-describe('Azurite private storage', () => {
-  it('stores and reads a synthetic fixture, and rejects anonymous reads', async () => {
+
+describe('local private storage', () => {
+  it('persists a synthetic save and exposes no static download route', async () => {
     const storage = createStorage(config);
-    const container = storage.getContainerClient(config.STORAGE_CONTAINER_SAVES);
-    const blob = container.getBlockBlobClient('integration/' + randomUUID());
+    await storage.initialize();
+    const key = createStorageKey('saves');
     const data = Buffer.from('synthetic save fixture; not a ROM');
     try {
-      await blob.uploadData(data);
-      const downloaded = await blob.downloadToBuffer();
-      expect(downloaded).toEqual(data);
-      const properties = await container.getProperties();
-      expect(properties.blobPublicAccess).toBeUndefined();
-      const anonymous = await fetch(blob.url);
-      expect(anonymous.ok).toBe(false);
+      await storage.put(key, data);
+      expect(await createStorage(config).read(key)).toEqual(data);
+      const response = await request(createApp(createLogger('silent'), {
+        database: async () => {}, storage: () => storage.check(),
+      })).get('/' + key);
+      expect(response.status).toBe(404);
     } finally {
-      await blob.deleteIfExists();
+      await storage.remove(key);
     }
   });
 });

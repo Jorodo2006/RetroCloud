@@ -172,7 +172,7 @@ model SaveVersion {
   clientOperationId String @map("client_operation_id") @db.Char(36)
   version Int @db.UnsignedInt
   parentVersionId String? @map("parent_version_id") @db.Char(36)
-  blobKey String @unique @map("blob_key") @db.VarChar(512)
+  storageKey String @unique @map("storage_key") @db.VarChar(512)
   checksum String @db.Char(64)
   sizeBytes BigInt @map("size_bytes") @db.UnsignedBigInt
   capturedAt DateTime @map("captured_at") @db.DateTime(3)
