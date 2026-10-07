@@ -1,0 +1,16 @@
+{
+  "name": "@retro-cloud/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@azure/storage-blob": "12.33.0",
+    "@prisma/adapter-mariadb": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "@retro-cloud/shared": "0.1.0",
+    "express": "5.2.1",
+    "helmet": "8.3.0",
+    "pino": "10.4.0",
+    "zod": "4.6.5"
+  }
+}
