@@ -1,62 +1,89 @@
-# Validación del almacenamiento autohospedado
+# Validación — fase 2
 
 Fecha: 7 de octubre de 2026 (Europe/Madrid).
 
 ## Entorno
 
-Windows con Node.js 24.14.0, npm 11.9.0 y Docker Desktop con contenedores Linux.
-MySQL 8.4, API con usuario node y volumen local storage-data.
-Lockfile generado desde manifiestos limpios con npm 11.21.0 y reproducido mediante npm ci.
+Windows, Node.js 24.14.0, npm 11.9.0, Docker Desktop con contenedores Linux y MySQL 8.4.
+Lockfile generado con npm 11.21.0 desde manifiestos limpios y reproducido con npm ci.
+API y pruebas Docker ejecutadas como node (uid 1000), sin root.
 
 ## Resultados
 
 | Comprobación | Resultado |
 | --- | --- |
-| Instalación limpia y compilación de la imagen | Correctas |
-| Validación Prisma y TypeScript estricto | Correctas en Windows y Docker |
-| Pruebas unitarias de configuración, HTTP y disco | 33/33 en Windows y Docker |
-| Pruebas de integración MySQL/almacenamiento local | 7/7 en Windows y Docker |
-| Migración 003 sobre la base existente | Aplicada correctamente, tres migraciones al día |
-| Comparación de MySQL con el esquema Prisma | Sin diferencias |
-| Escritura, reinicio real de la API y lectura del mismo archivo | Contenido conservado; fixture eliminado |
-| Readiness después del reinicio | HTTP 200, database y storage true |
+| Validación Prisma y TypeScript estricto | Correctas |
+| Construcción de imagen retro-cloud-local:phase2 | Correcta |
+| Pruebas unitarias Windows | 56/56 |
+| Pruebas unitarias Linux/Docker | 56/56 |
+| Integración Windows con MySQL real | 24/24 |
+| Integración Linux/Docker con MySQL real | 24/24 |
+| Migración 004 en bases temporales desde cero | Correcta en ambas plataformas |
+| Migración 004 sobre la base local existente | Aplicada; cuatro migraciones al día |
+| Comparación de MySQL con db/schema.prisma | Sin diferencias |
+| GET /health/ready en la API arrancada | 200; database y storage true |
+| Rutas /auth/me, /library y /agent/library sin credenciales | 401 |
+| Registro con cuerpo inválido | 400 VALIDATION_ERROR, sin crear cuenta |
 | Inicializadores migrate y storage-init | Exited (0) |
-| npm audit | 0 vulnerabilidades reportadas |
-| Paquetes @azure en el lockfile | 0 |
-| Contenedor Azurite | Retirado; volumen anterior conservado |
+| Usuario real de la API | uid=1000(node) |
+| Auditoría durante npm ci de la imagen final | 0 vulnerabilidades |
+| Estado de la base real tras las pruebas | 0 usuarios, primera cuenta disponible, 18 consolas, 0 versiones de saves |
 
-Antes de sustituir Azurite se comprobó que no había versiones de saves en MySQL ni archivos
-en sus contenedores saves/captures. No fue necesaria una transferencia de partidas reales.
-La columna y el índice se renombraron mediante una nueva migración; el historial SQL anterior
-se conserva sin cambios.
+Los temporales de Vitest se ajustaron para poder probar como node: cargador de configuración
+nativo, caché desactivada en Docker y archivos de prueba en la carpeta temporal del sistema.
+La prueba que realiza varias derivaciones scrypt tiene 15 segundos de margen para equipos
+con carga; no se redujeron los parámetros de seguridad de las contraseñas.
 
-## Qué cubren las pruebas
+## Cobertura
 
-- Rechazo de rutas relativas/absolutas, traversal, separadores alternativos y nombres no válidos.
-- Rechazo de symlinks y junctions en categorías y en la raíz.
-- Escrituras completas, ausencia de sobrescritura y competencia entre dos escritores.
-- Persistencia entre instancias del adaptador y limpieza de probes.
-- Healthchecks, errores HTTP y rechazo de descargas por rutas estáticas.
-- Unicidad, pertenencia de sesiones/saves, ramas, padres de otra partida y checksums SQL.
+- Contraseñas con sal independiente; verificación correcta, incorrecta y de usuario inexistente.
+- JWT: firma, emisor, audiencia, algoritmo, caducidad y sesión obligatoria.
+- Registro de primera cuenta bajo dos peticiones simultáneas; modos cerrado y abierto.
+- Cookies HttpOnly/SameSite, cabecera de cliente, origen, rate limit y perfiles sin secretos.
+- Refresh rotativo, replay, renovaciones simultáneas, logout y caducidad de sesión.
+- Registro, listado, rotación y revocación de dispositivos; acceso a recursos de otro usuario rechazado.
+- Lotes de biblioteca idempotentes, fingerprints compartidos y concurrencia entre dispositivos.
+- Títulos privados, filtros, aislamiento por usuario, baja lógica y reactivación.
+- Rollback del lote completo ante conflicto de consola, sin inserciones parciales.
+- Rechazo de campos ROM/ruta/usuario adicionales, hashes incorrectos, tamaños fuera de rango y paginación inválida.
+- Restricciones MySQL de sesiones y saves previstas en fase 1.
+- Disco: claves seguras, symlinks/junctions, escrituras concurrentes, ausencia de sobrescritura y persistencia.
 
-Los archivos utilizados son sintéticos; no se han utilizado ROMs ni saves del usuario.
+Las pruebas de integración crean una base retro_test_<aleatorio> y un almacén temporal.
+Al terminar eliminan la base, sus permisos y los archivos. No crean cuentas en la base real,
+no consumen su primer registro y no usan ROMs ni saves del usuario.
 
 ## Repetir
 
-Con MySQL iniciado según el README:
+Desde PowerShell, con MySQL iniciado mediante Compose:
 
 ```powershell
+npm ci
+npm run env:init
 npm run check
-npm run storage:init
+docker compose up --build -d
 npm run test:integration
+npm run test:unit:docker
+npm run test:integration:docker
 npm run db:status
 npm run db:diff
-npm audit
 ```
 
-## Límites
+La imagen debe reconstruirse después de cambiar código antes de las pruebas Docker.
+Los ejemplos para utilizar los endpoints y crear la primera cuenta están en [API.md](API.md).
 
-No están implementados autenticación, cola offline, sincronización ni resolución de conflictos.
-No se ha inspeccionado Retro Machine, que está en otro PC.
-No se ha realizado un simulacro completo de backup/restauración; queda para el despliegue local.
-La comparación Prisma no representa los CHECK SQL adicionales, que se verifican mediante tests.
+## Pendiente de otras fases
+
+Agente, escaneo real de ROMs, cola offline, sesiones de juego, sincronización/versionado de saves,
+resolución de conflictos, portal e integraciones opcionales. No se ha inspeccionado Retro Machine,
+que sigue en otro PC. No hay recuperación/cambio de contraseña, correo, limpieza automática de
+sesiones caducadas, despliegue LAN/HTTPS ni simulacro completo de backup/restauración.
+
+La comparación Prisma no representa los CHECK SQL adicionales; estos se verifican en integración.
+El límite de peticiones usa memoria de un proceso y se reinicia con la API.
+
+## Antecedente: almacenamiento local de fase 1
+
+La sustitución de Azurite se validó con 33 pruebas unitarias y 7 de integración en ambas plataformas.
+Se comprobó persistencia tras reiniciar la API y ausencia de archivos/versiones reales que trasladar.
+Las migraciones 001–003 se conservan intactas y el volumen antiguo no participa en Compose.

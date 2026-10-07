@@ -5,9 +5,10 @@ Biblioteca de metadatos, sesiones, partidas versionadas y logros para Retro Mach
 
 ## Estado
 
-Fase 1: monorepo TypeScript estricto, API Express base, migraciones MySQL y almacenamiento
-local persistente, con configuración Zod, logs y pruebas. `agent/` y `web/` están reservados
-para futuras fases. Retro Machine está en otro PC y falta revisar cómo ejecuta sus emuladores.
+Fases 1 y 2: monorepo TypeScript estricto, MySQL con migraciones, almacenamiento local,
+autenticación de usuarios, dispositivos con claves revocables y biblioteca privada de metadatos.
+`agent/` y `web/` siguen reservados para sus fases. Retro Machine está en otro PC y falta
+revisar cómo ejecuta sus emuladores.
 
 No se necesita una cuenta cloud. La instalación inicial descarga dependencias e imágenes;
 una vez instaladas, los servicios locales funcionan sin Internet.
@@ -26,8 +27,8 @@ docker compose ps -a
 Invoke-RestMethod http://localhost:3000/health/ready
 ```
 
-`env:init` genera las credenciales de MySQL y la ruta local en `.env`, sin mostrar secretos
-ni sobrescribir archivos existentes. Consulta [.env.example](.env.example).
+`env:init` genera las credenciales MySQL, la clave JWT y la ruta local en `.env`, sin mostrarlas.
+Si `.env` ya existe, conserva sus valores y añade JWT_SECRET solo cuando falta. Consulta [.env.example](.env.example).
 En una configuración anterior, sustituye las variables de Azure/Azurite por `STORAGE_ROOT`,
 con una ruta absoluta; conserva las credenciales actuales de MySQL.
 
@@ -43,6 +44,24 @@ Puertos locales: API `3000` y MySQL `3307`, publicados solo en `127.0.0.1`.
 No hay servidor de archivos ni puerto de almacenamiento.
 Si cambias credenciales/puerto de MySQL, actualiza también `DATABASE_URL` para Windows.
 
+## Primera cuenta y API
+
+Todavía no hay pantalla web de registro. Sigue los ejemplos PowerShell de [API.md](docs/API.md)
+para crear tu cuenta, iniciar sesión, registrar dispositivos y consultar la biblioteca.
+La contraseña se solicita sin guardarla en el historial de comandos.
+
+Por defecto, REGISTRATION_MODE=first-user permite la primera cuenta y cierra el registro.
+Puedes usar open para más cuentas o closed para impedir altas; reinicia la API al cambiarlo.
+El indicador se conserva en MySQL. Las pruebas usan otra base y no consumen tu primera cuenta.
+
+- Usuarios: registro, login, perfil, refresh y logout. JWT de 15 minutos y sesión de 30 días.
+- Dispositivos: alta, listado, rotación de API key y revocación; se guardan solo hashes.
+- Biblioteca: filtros y sincronización idempotente de metadatos, aislados por usuario.
+- Los lotes aceptan título, consola, SHA-256 y tamaño; nunca ROMs ni rutas locales.
+
+Si cambias el puerto de API, ajusta APP_ORIGIN. El portal futuro usará el mismo origen
+o un proxy de desarrollo; no hay CORS habilitado.
+
 ## Dónde se guarda todo
 
 - MySQL: volumen Docker `retro-cloud_mysql-data`.
@@ -56,26 +75,33 @@ con archivos reales y copia los archivos y su base de datos conjuntamente al tra
 
 Los archivos se identifican como `saves/<uuid>` o `captures/<uuid>`; los nombres originales y
 las rutas arbitrarias no se utilizan. Una clave existente no se sobrescribe.
-La API no expone rutas de descarga todavía: la autenticación y la sincronización llegarán después.
+La API no expone todavía rutas de subida/descarga de saves; corresponden a la fase 5.
 
 ## Pruebas y desarrollo
 
 ```powershell
 npm run check
-npm run storage:init
 npm run test:integration
+npm run test:unit:docker
+npm run test:integration:docker
 npm run db:status
 npm run db:diff
 ```
 
-`check` valida Prisma, los tipos y las pruebas unitarias. La integración usa MySQL local
-y el almacén de Windows de `.env`; crea fixtures sintéticos y los elimina.
-Comprueba rutas, enlaces simbólicos, escrituras concurrentes, persistencia y restricciones SQL.
+`check` valida Prisma, TypeScript y pruebas unitarias. La integración requiere MySQL iniciado
+mediante Compose: crea una base retro_test_<aleatorio>, aplica migraciones y usa archivos
+temporales. Al terminar elimina base, permisos temporales y archivos, sin usar tus datos.
+
+`test:integration` ejecuta Node en Windows; `test:integration:docker` lo ejecuta en Linux como node.
+Construye la imagen con `docker compose build api` después de cambiar código antes de las pruebas Docker.
+Vitest usa carga nativa y caché desactivada en Docker para no escribir en el código de la imagen.
+Se comprueban autenticación, revocación, aislamiento, reintentos concurrentes y restricciones SQL.
 
 Para ejecutar la API en Windows:
 
 ```powershell
 docker compose stop api
+npm run db:migrate
 npm run storage:init
 npm run dev
 ```
@@ -87,7 +113,8 @@ Puedes volver a la API Docker con `docker compose up -d api` después de detener
 
 `db/schema.prisma` describe el modelo; `db/migrations/` conserva el SQL versionado.
 No se modifican migraciones aplicadas. La tercera renombra `blob_key` a `storage_key`
-sin borrar registros ni modificar las dos anteriores.
+sin borrar registros ni modificar las dos anteriores. La cuarta añade sesiones de autenticación,
+refresh tokens, cierre del primer registro, títulos privados y catálogo inicial de consolas.
 
 ```powershell
 npm run db:migrate
@@ -119,10 +146,10 @@ Se comprobó que no contenía archivos ni versiones de partidas al hacer este ca
 
 ## Pendiente
 
-Fase 2: autenticación, dispositivos y biblioteca. Después: agente, sesiones, sincronización de saves,
-portal e integraciones opcionales. La fase 9 será despliegue en tu propio equipo y CI opcional.
-Antes de exponer la API a otros dispositivos habrá que completar autenticación y configurar
-acceso de red, HTTPS y copias de seguridad. Actualmente solo escucha en loopback del host.
+Fase 3: agente, escaneo y envío de biblioteca, tras revisar la integración con Retro Machine.
+Después: sesiones, sincronización de saves, portal e integraciones opcionales. La fase 9 será despliegue en tu propio equipo y CI opcional.
+Antes de exponer la API a otros dispositivos habrá que configurar acceso de red, HTTPS
+y copias de seguridad. Actualmente solo escucha en loopback del host.
 
-Detalles: [arquitectura](docs/ARCHITECTURE.md), [dependencias](docs/DEPENDENCIES.md)
+Detalles: [API](docs/API.md), [arquitectura](docs/ARCHITECTURE.md), [dependencias](docs/DEPENDENCIES.md)
 y [validación](docs/VALIDATION.md).

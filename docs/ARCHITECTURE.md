@@ -36,7 +36,8 @@ flowchart LR
 - `scripts/`: generación de entorno e inicialización de almacenamiento.
 - `tests/`: validación unitaria y contra infraestructura real.
 
-Solo existen `GET /health/live` y `GET /health/ready`. Readiness consulta MySQL y comprueba
+Además de auth, dispositivos y biblioteca, existen `GET /health/live` y `GET /health/ready`.
+El contrato HTTP y los ejemplos están en [API.md](API.md). Readiness consulta MySQL y comprueba
 escritura/lectura/borrado de un archivo sintético en cada carpeta. Los probes se eliminan.
 Las respuestas de error no muestran detalles internos. Los logs JSON llevan un identificador
 de petición y no incluyen cuerpos, cabeceras de autenticación ni URLs de conexión.
@@ -45,11 +46,13 @@ de petición y no incluyen cuerpos, cabeceras de autenticación ni URLs de conex
 
 | Tablas | Propósito |
 | --- | --- |
-| users | Email único y hash de contraseña; autenticación pendiente. |
+| users | Email normalizado, nombre visible y contraseña scrypt con sal aleatoria. |
+| registration_gate | Mutex SQL y cierre permanente del primer registro. |
+| auth_sessions, refresh_tokens | Sesión de acceso revocable; refresh de un uso almacenado como hash. |
 | devices, device_api_keys | Propiedad, revocación y rotación. Solo hashes de claves aleatorias. |
 | consoles, games | Juego canónico, consola, título y metadatos. |
 | game_files | Hash, algoritmo, tamaño y revisión; nunca binarios ROM ni rutas. |
-| library_entries | Presencia por archivo/dispositivo, con baja lógica y unicidad. |
+| library_entries | Presencia y título privado por archivo/dispositivo, baja lógica y unicidad. |
 | play_sessions | Identificador del cliente, inicio, fin y duración. |
 | save_files | Partida lógica por usuario, juego, tipo, slot y formato. |
 | save_versions | Versión, padre, origen, SHA-256, tamaño y storage_key. |
@@ -58,7 +61,7 @@ de petición y no incluyen cuerpos, cabeceras de autenticación ni URLs de conex
 | achievements, user_achievements | Catálogo y desbloqueos softcore/hardcore. |
 
 UUID generables offline y fechas UTC con precisión de milisegundos. Los tamaños BIGINT se
-serializarán como cadenas decimales en futuros endpoints. Los hashes son hexadecimales en
+serializan como cadenas decimales en los endpoints. Los hashes son hexadecimales en
 minúsculas. Los hashes de RetroAchievements pueden requerir normalización específica;
 no se supone que sean el MD5 del archivo completo.
 
@@ -66,7 +69,7 @@ Las claves foráneas compuestas impiden asociar sesiones/versiones a dispositivo
 y exigen que padre e hijo pertenezcan a la misma partida.
 Las claves únicas de sesión/operación permitirán identificar reintentos.
 CHECK SQL comprueban hashes, versiones positivas e intervalos de sesión.
-Revocar un dispositivo conservará su historial; el borrado de cuenta se diseñará después.
+Revocar un dispositivo conserva su historial; el borrado de cuenta se diseñará después.
 
 ## Almacenamiento local
 
@@ -101,7 +104,8 @@ Un padre permite representar ramas de dos dispositivos sin sobrescribir archivos
 En fase 5 se implementarán asignación de versiones en transacción, subida al cerrar el juego,
 resolución explícita de conflictos, restauración como nueva versión y limpieza de archivos huérfanos.
 La atomicidad de un archivo no sustituye a una transacción entre disco y MySQL.
-Aún no hay endpoints idempotentes, política de selección de rama ni transferencias del agente.
+La biblioteca ya admite reintentos idempotentes; para saves aún no hay endpoints, política
+de selección de rama ni transferencias del agente.
 
 ## Ejecución, persistencia y despliegue
 
@@ -112,5 +116,56 @@ Los inicializadores son repetibles. `.env`, archivos y backups no entran en la i
 Los volúmenes sobreviven a recreaciones y a `docker compose down`.
 
 Se guardarán MySQL y archivos conjuntamente con la API detenida; ver [BACKUPS.md](BACKUPS.md).
-El despliegue final será en el equipo del usuario. TLS, autenticación, acceso desde LAN,
+El despliegue final será en el equipo del usuario. TLS, acceso desde LAN,
 automatización de backups y CI opcional quedan para sus fases.
+
+## Autenticación local — fase 2
+
+Contraseñas derivadas con scrypt asíncrono (N=32768, r=8, p=3, sal aleatoria de 16 bytes,
+resultado de 64 bytes); comparación constante y trabajo equivalente para usuarios inexistentes.
+JWT HS256 con secreto aleatorio de 32 bytes en .env, issuer/audience fijos, sub=userId,
+sid=authSessionId, iat y exp obligatorios. Duración: 15 minutos. Se comprueba además en MySQL
+que la sesión no esté revocada ni vencida: logout invalida inmediatamente el JWT de esa sesión.
+
+Refresh opaco de 32 bytes, solo en cookie HttpOnly/SameSite=Strict; MySQL conserva SHA-256.
+La sesión tiene 30 días de vida absoluta. Renovar rota el token y marca el anterior como usado.
+Un bloqueo de fila serializa las renovaciones; reutilizar uno consumido revoca la sesión.
+Se conservan tokens consumidos para detectar replays; la limpieza de sesiones caducadas queda pendiente.
+El cliente deberá coordinar el refresh entre pestañas y volver a iniciar sesión tras un reintento ambiguo.
+
+Las operaciones con cookie requieren X-Retro-Client: web y verifican Origin si está presente.
+Sin CORS; el portal futuro usará mismo origen/proxy. NODE_ENV=production exige cookies Secure
+y APP_ORIGIN HTTPS. Se limita login/registro por IP en memoria; no se confía en cabeceras de proxy.
+No se incorporan correo, recuperación de contraseñas ni proveedores de identidad externos.
+
+REGISTRATION_MODE permite first-user/open/closed. Una fila singleton bloqueada con FOR UPDATE
+impide dos primeras altas simultáneas. El indicador no se reinicia al borrar cuentas;
+la migración lo deja activado si ya hay usuarios.
+
+## Dispositivos y sincronización de biblioteca — fase 2
+
+Cada API key contiene 32 bytes aleatorios, prefijo rcd_ y se muestra una sola vez. Se guarda
+solo su hash y un prefijo identificativo. Rotación y revocación bloquean la fila del dispositivo;
+los lotes del agente bloquean la misma fila y revalidan la clave antes de escribir. Así una clave
+revocada durante una petición no puede seguir escribiendo después de completarse la revocación.
+Todas las lecturas de dispositivos/biblioteca se filtran por el usuario autenticado, sin userId del cliente.
+
+El catálogo de consolas se inicia en la migración 004; no presupone las consolas instaladas en Retro Machine.
+El agente enviará SHA-256 del archivo completo, tamaño decimal, slug de consola y título provisional.
+Zod rechaza campos extra y limita cada lote a 50 elementos, dentro del límite HTTP de 32 KiB.
+El fingerprint algoritmo/checksum/tamaño es único. Un lote es una transacción con orden estable
+y reintentos acotados ante carreras de unicidad o deadlocks; repetirlo no duplica registros.
+
+Los títulos provisionales pertenecen a library_entries.display_title. El Game compartido empieza
+con un título neutro hasta su identificación canónica; un dispositivo no modifica metadatos privados
+ni títulos de otro. No se consulta aún ningún proveedor de metadatos.
+La baja es explícita y lógica; omitir entradas en un lote parcial no borra biblioteca.
+Reenviar una entrada la reactiva conservando su identidad y primera fecha de observación.
+Los filtros de lectura son consola y dispositivo, con paginación limitada.
+
+## Pruebas sin datos del usuario
+
+scripts/test-integration.ts crea una base MySQL aleatoria retro_test_*, concede permisos temporales
+al usuario de desarrollo y aplica todas las migraciones. Ejecuta los tests en Windows o en un contenedor
+Linux sin privilegios, con directorio temporal de archivos y secreto JWT aleatorio. Al terminar elimina
+base, permisos y archivos. La suite de auth exige ese entorno aislado: sus altas no cierran el registro real.

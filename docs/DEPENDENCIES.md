@@ -13,6 +13,7 @@ Se mantienen las versiones corregidas:
 
 - mariadb: 3.5.4, para el adaptador MySQL.
 - mysql2: 3.24.5, utilizado por las herramientas de Prisma.
+- ip-address: 10.7.3, transitiva de express-rate-limit; corrige avisos de validación de direcciones.
 - deepmerge-ts: 8.0.2, utilizado por la configuración de Prisma.
 
 El lockfile se genera con npm 11.21.0 desde los manifiestos limpios, para evitar reutilizar
@@ -22,3 +23,11 @@ y el almacenamiento local. Se podrán retirar cuando las dependencias superiores
 las versiones corregidas.
 
 Los resultados están en [VALIDATION.md](VALIDATION.md).
+
+## Autenticación
+
+jose 6.2.12 firma/verifica JWT; express-rate-limit 8.7.1 limita intentos por IP.
+Las contraseñas utilizan scrypt de node:crypto, sin binarios nativos adicionales.
+Referencias primarias: [jose](https://github.com/panva/jose),
+[Node crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html),
+[express-rate-limit](https://express-rate-limit.mintlify.app/reference/configuration).
