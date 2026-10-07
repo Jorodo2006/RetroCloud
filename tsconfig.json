@@ -1,4 +1,14 @@
 {
   "files": [],
-  "references": [{ "path": "packages/shared" }, { "path": "api" }]
+  "references": [
+    {
+      "path": "packages/shared"
+    },
+    {
+      "path": "api"
+    },
+    {
+      "path": "agent"
+    }
+  ]
 }

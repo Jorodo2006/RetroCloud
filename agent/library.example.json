@@ -1,0 +1,12 @@
+{
+  "roots": [
+    {
+      "directory": "snes",
+      "consoleSlug": "snes",
+      "extensions": [
+        ".sfc",
+        ".smc"
+      ]
+    }
+  ]
+}

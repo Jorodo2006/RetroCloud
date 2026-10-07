@@ -2,5 +2,10 @@
   "name": "@retro-cloud/agent",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@retro-cloud/shared": "0.1.0",
+    "pino": "10.4.0",
+    "zod": "4.6.5"
+  }
 }
