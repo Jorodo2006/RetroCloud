@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import express from 'express';
 import type { ErrorRequestHandler } from 'express';
 import helmet from 'helmet';
+import { ZodError } from 'zod';
+import { ApiError } from './errors.js';
+import { routes } from './routes.js';
+import type { ApiContext } from './routes.js';
 import type { Logger } from 'pino';
 import { healthResponseSchema } from '@retro-cloud/shared';
 
@@ -10,7 +14,7 @@ export interface HealthChecks {
   storage: () => Promise<void>;
 }
 
-export function createApp(logger: Logger, checks: HealthChecks) {
+export function createApp(logger: Logger, checks: HealthChecks, context?: ApiContext) {
   const app = express();
   app.disable('x-powered-by');
   app.use(helmet());
@@ -37,17 +41,20 @@ export function createApp(logger: Logger, checks: HealthChecks) {
     if (!ready) logger.warn({ requestId: res.locals.requestId, checks: dependencies }, 'dependencies unavailable');
     res.status(ready ? 200 : 503).json(healthResponseSchema.parse({ status: ready ? 'ok' : 'degraded', checks: dependencies }));
   });
+  if (context) app.use(routes(context));
   app.use((_req, res) => {
     res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found', requestId: res.locals.requestId } });
   });
   const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
     const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
-    const code = status === 400 ? 'INVALID_JSON' : status === 413 ? 'PAYLOAD_TOO_LARGE' : 'INTERNAL_ERROR';
-    const httpStatus = status === 400 || status === 413 ? status : 500;
+    const code = error instanceof ApiError ? error.code : error instanceof ZodError ? 'VALIDATION_ERROR'
+      : status === 400 ? 'INVALID_JSON' : status === 413 ? 'PAYLOAD_TOO_LARGE' : 'INTERNAL_ERROR';
+    const httpStatus = error instanceof ApiError ? error.status : error instanceof ZodError ? 400
+      : status === 400 || status === 413 ? status : 500;
     logger.error({ requestId: res.locals.requestId, code }, 'request failed');
     if (res.headersSent) return res.end();
     res.status(httpStatus).json({ error: {
-      code, message: httpStatus === 500 ? 'Internal server error' : 'Invalid request body',
+      code, message: error instanceof ApiError ? error.message : httpStatus === 500 ? 'Internal server error' : 'Invalid request body',
       requestId: res.locals.requestId,
     } });
   };

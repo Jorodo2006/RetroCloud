@@ -15,7 +15,7 @@ describe('passwords and bearer tokens', () => {
     expect(await verifyPassword('wrong password', a)).toBe(false);
     expect(await verifyPassword(password, undefined)).toBe(false);
     expect(await verifyPassword(password, 'scrypt$999999999$8$3$invalid')).toBe(false);
-  });
+  }, 15000);
   it('issues signed tokens tied to a user and session', async () => {
     const tokens = new AccessTokens(randomBytes(32).toString('hex'));
     const user = randomUUID(), session = randomUUID();

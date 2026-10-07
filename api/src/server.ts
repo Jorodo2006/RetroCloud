@@ -8,7 +8,7 @@ try {
   const config = loadConfig();
   const logger = createLogger(config.LOG_LEVEL);
   const infrastructure = createInfrastructure(config);
-  const server = createApp(logger, infrastructure.checks).listen(config.PORT, '0.0.0.0', () => {
+  const server = createApp(logger, infrastructure.checks, { database: infrastructure.database, config }).listen(config.PORT, '0.0.0.0', () => {
     logger.info({ port: config.PORT }, 'Retro Cloud API listening');
   });
   let stopping = false;
