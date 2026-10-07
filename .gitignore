@@ -13,3 +13,6 @@ api/src/generated/
 *.sav
 *.srm
 *.state
+
+data/
+backups/

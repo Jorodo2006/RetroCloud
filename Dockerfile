@@ -10,6 +10,7 @@ COPY packages/shared/package.json ./packages/shared/
 RUN npm ci
 COPY . .
 RUN npm run build
+RUN mkdir -p /data/storage/saves /data/storage/captures && chown -R node:node /data/storage
 ENV NODE_ENV=development
 USER node
 EXPOSE 3000

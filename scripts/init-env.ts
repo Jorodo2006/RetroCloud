@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 const template = await readFile(new URL('../.env.example', import.meta.url), 'utf8');
 const output = template
   .replaceAll('__MYSQL_PASSWORD__', randomBytes(24).toString('hex'))
   .replaceAll('__MYSQL_ROOT_PASSWORD__', randomBytes(24).toString('hex'))
-  .replaceAll('__STORAGE_ACCOUNT_KEY__', randomBytes(64).toString('base64'));
+  .replaceAll('__STORAGE_ROOT__', fileURLToPath(new URL('../data/storage', import.meta.url)).replaceAll('\\', '/'));
 
 try {
   await writeFile(new URL('../.env', import.meta.url), output, { flag: 'wx', mode: 0o600 });

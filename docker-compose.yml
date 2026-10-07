@@ -5,11 +5,7 @@ x-app-env: &app-env
   PORT: 3000
   LOG_LEVEL: ${LOG_LEVEL:-info}
   DATABASE_URL: mysql://${MYSQL_USER:?Run npm run env:init}:${MYSQL_PASSWORD:?Run npm run env:init}@mysql:3306/${MYSQL_DATABASE:?Run npm run env:init}
-  STORAGE_ACCOUNT_NAME: ${STORAGE_ACCOUNT_NAME:?Run npm run env:init}
-  STORAGE_ACCOUNT_KEY: ${STORAGE_ACCOUNT_KEY:?Run npm run env:init}
-  STORAGE_BLOB_ENDPOINT: http://azurite:10000/${STORAGE_ACCOUNT_NAME}
-  STORAGE_CONTAINER_SAVES: ${STORAGE_CONTAINER_SAVES:-saves}
-  STORAGE_CONTAINER_CAPTURES: ${STORAGE_CONTAINER_CAPTURES:-captures}
+  STORAGE_ROOT: /data/storage
 
 services:
   mysql:
@@ -32,21 +28,6 @@ services:
       retries: 30
       start_period: 30s
 
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
-    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--location", "/data", "--silent", "--disableProductStyleUrl"]
-    environment:
-      AZURITE_ACCOUNTS: ${STORAGE_ACCOUNT_NAME}:${STORAGE_ACCOUNT_KEY}
-    ports:
-      - "127.0.0.1:${AZURITE_PORT:-10000}:10000"
-    volumes:
-      - azurite-data:/data
-    healthcheck:
-      test: ["CMD", "node", "-e", "const s=require('net').connect(10000,'127.0.0.1',()=>{s.end();process.exit(0)});s.setTimeout(2000,()=>process.exit(1));s.on('error',()=>process.exit(1))"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
   migrate:
     build: .
     image: retro-cloud-local:phase1
@@ -62,15 +43,16 @@ services:
     build: .
     command: ["node", "--import", "tsx", "scripts/init-storage.ts"]
     environment: *app-env
-    depends_on:
-      azurite:
-        condition: service_healthy
+    volumes:
+      - storage-data:/data/storage
     restart: "no"
 
   api:
     image: retro-cloud-local:phase1
     build: .
     environment: *app-env
+    volumes:
+      - storage-data:/data/storage
     ports:
       - "127.0.0.1:${PORT:-3000}:3000"
     depends_on:
@@ -88,4 +70,4 @@ services:
 
 volumes:
   mysql-data:
-  azurite-data:
+  storage-data:
