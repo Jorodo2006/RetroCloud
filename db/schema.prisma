@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client"
+  output = "../api/src/generated/prisma"
+  moduleFormat = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum HashAlgorithm {
+  SHA256
+  MD5
+  SHA1
+  CRC32
+}
+
+enum SaveKind {
+  SRAM
+  SAVE_STATE
+  MEMORY_CARD
+  OTHER
+}
+
+enum UnlockMode {
+  SOFTCORE
+  HARDCORE
+}
+
+model User {
+  id String @id @default(uuid()) @db.Char(36)
+  email String @unique @db.VarChar(254)
+  passwordHash String @map("password_hash") @db.VarChar(255)
+  displayName String @map("display_name") @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  devices Device[]
+  saveFiles SaveFile[]
+  achievementAccounts AchievementAccount[]
+  achievements UserAchievement[]
+  @@map("users")
+}
+
+model Device {
+  id String @id @default(uuid()) @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+  name String @db.VarChar(100)
+  lastSeenAt DateTime? @map("last_seen_at") @db.DateTime(3)
+  revokedAt DateTime? @map("revoked_at") @db.DateTime(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  keys DeviceApiKey[]
+  library LibraryEntry[]
+  sessions PlaySession[]
+  saveVersions SaveVersion[]
+  @@unique([id, userId])
+  @@map("devices")
+}
+
+model DeviceApiKey {
+  id String @id @default(uuid()) @db.Char(36)
+  deviceId String @map("device_id") @db.Char(36)
+  keyHash String @unique @map("key_hash") @db.Char(64)
+  keyPrefix String @map("key_prefix") @db.VarChar(16)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  expiresAt DateTime? @map("expires_at") @db.DateTime(3)
+  revokedAt DateTime? @map("revoked_at") @db.DateTime(3)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  @@index([deviceId])
+  @@map("device_api_keys")
+}
+
+model Console {
+  id String @id @default(uuid()) @db.Char(36)
+  slug String @unique @db.VarChar(80)
+  name String @db.VarChar(100)
+  retroAchievementsId Int? @unique @map("retro_achievements_id") @db.UnsignedInt
+  games Game[]
+  @@map("consoles")
+}
+
+model Game {
+  id String @id @default(uuid()) @db.Char(36)
+  consoleId String @map("console_id") @db.Char(36)
+  title String @db.VarChar(255)
+  metadata Json?
+  coverUrl String? @map("cover_url") @db.VarChar(2048)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  console Console @relation(fields: [consoleId], references: [id], onDelete: Restrict)
+  files GameFile[]
+  sessions PlaySession[]
+  saveFiles SaveFile[]
+  externalIds GameExternalId[]
+  @@index([consoleId, title])
+  @@map("games")
+}
+
+model GameFile {
+  id String @id @default(uuid()) @db.Char(36)
+  gameId String @map("game_id") @db.Char(36)
+  hashAlgorithm HashAlgorithm @map("hash_algorithm")
+  checksum String @db.VarChar(64)
+  sizeBytes BigInt @map("size_bytes") @db.UnsignedBigInt
+  revision String? @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  library LibraryEntry[]
+  @@unique([hashAlgorithm, checksum, sizeBytes])
+  @@index([gameId])
+  @@map("game_files")
+}
+
+model LibraryEntry {
+  id String @id @default(uuid()) @db.Char(36)
+  deviceId String @map("device_id") @db.Char(36)
+  gameFileId String @map("game_file_id") @db.Char(36)
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.DateTime(3)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.DateTime(3)
+  removedAt DateTime? @map("removed_at") @db.DateTime(3)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  gameFile GameFile @relation(fields: [gameFileId], references: [id], onDelete: Restrict)
+  @@unique([deviceId, gameFileId])
+  @@index([gameFileId])
+  @@map("library_entries")
+}
+
+model PlaySession {
+  id String @id @default(uuid()) @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+  deviceId String @map("device_id") @db.Char(36)
+  gameId String @map("game_id") @db.Char(36)
+  clientSessionId String @map("client_session_id") @db.Char(36)
+  startedAt DateTime @map("started_at") @db.DateTime(3)
+  endedAt DateTime? @map("ended_at") @db.DateTime(3)
+  durationSeconds Int? @map("duration_seconds") @db.UnsignedInt
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  device Device @relation(fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  @@unique([deviceId, clientSessionId])
+  @@index([userId, startedAt])
+  @@index([gameId, startedAt])
+  @@map("play_sessions")
+}
+
+model SaveFile {
+  id String @id @default(uuid()) @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+  gameId String @map("game_id") @db.Char(36)
+  kind SaveKind
+  slot String @default("default") @db.VarChar(100)
+  formatKey String @map("format_key") @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  versions SaveVersion[] @relation("SaveFileVersions")
+  @@unique([userId, gameId, kind, slot, formatKey])
+  @@unique([id, userId])
+  @@index([gameId])
+  @@map("save_files")
+}
+
+model SaveVersion {
+  id String @id @default(uuid()) @db.Char(36)
+  saveFileId String @map("save_file_id") @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+  deviceId String @map("device_id") @db.Char(36)
+  clientOperationId String @map("client_operation_id") @db.Char(36)
+  version Int @db.UnsignedInt
+  parentVersionId String? @map("parent_version_id") @db.Char(36)
+  blobKey String @unique @map("blob_key") @db.VarChar(512)
+  checksum String @db.Char(64)
+  sizeBytes BigInt @map("size_bytes") @db.UnsignedBigInt
+  capturedAt DateTime @map("captured_at") @db.DateTime(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  saveFile SaveFile @relation("SaveFileVersions", fields: [saveFileId, userId], references: [id, userId], onDelete: Restrict)
+  device Device @relation(fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  parent SaveVersion? @relation("SaveAncestry", fields: [parentVersionId, saveFileId], references: [id, saveFileId], onDelete: Restrict, onUpdate: Restrict)
+  children SaveVersion[] @relation("SaveAncestry")
+  @@unique([saveFileId, version])
+  @@unique([deviceId, clientOperationId])
+  @@unique([id, saveFileId])
+  @@index([saveFileId, userId])
+  @@index([deviceId, userId])
+  @@map("save_versions")
+}
+
+model GameExternalId {
+  id String @id @default(uuid()) @db.Char(36)
+  gameId String @map("game_id") @db.Char(36)
+  provider String @db.VarChar(40)
+  externalId String @map("external_id") @db.VarChar(128)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  achievements Achievement[]
+  @@unique([provider, externalId])
+  @@index([gameId, provider])
+  @@map("game_external_ids")
+}
+
+model MetadataCache {
+  id String @id @default(uuid()) @db.Char(36)
+  provider String @db.VarChar(40)
+  cacheKey String @map("cache_key") @db.VarChar(191)
+  payload Json
+  fetchedAt DateTime @default(now()) @map("fetched_at") @db.DateTime(3)
+  expiresAt DateTime @map("expires_at") @db.DateTime(3)
+  @@unique([provider, cacheKey])
+  @@index([expiresAt])
+  @@map("metadata_cache")
+}
+
+model AchievementAccount {
+  id String @id @default(uuid()) @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+  provider String @db.VarChar(40)
+  username String @db.VarChar(100)
+  linkedAt DateTime @default(now()) @map("linked_at") @db.DateTime(3)
+  lastSyncedAt DateTime? @map("last_synced_at") @db.DateTime(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, provider])
+  @@unique([provider, username])
+  @@map("achievement_accounts")
+}
+
+model Achievement {
+  id String @id @default(uuid()) @db.Char(36)
+  gameExternalId String @map("game_external_id") @db.Char(36)
+  externalId String @map("external_id") @db.VarChar(128)
+  title String @db.VarChar(255)
+  description String @db.Text
+  points Int @db.UnsignedInt
+  badgeUrl String? @map("badge_url") @db.VarChar(2048)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  game GameExternalId @relation(fields: [gameExternalId], references: [id], onDelete: Restrict)
+  unlocks UserAchievement[]
+  @@unique([gameExternalId, externalId])
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id String @id @default(uuid()) @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+  achievementId String @map("achievement_id") @db.Char(36)
+  mode UnlockMode
+  unlockedAt DateTime @map("unlocked_at") @db.DateTime(3)
+  syncedAt DateTime @default(now()) @map("synced_at") @db.DateTime(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Restrict)
+  @@unique([userId, achievementId, mode])
+  @@index([achievementId])
+  @@map("user_achievements")
+}
