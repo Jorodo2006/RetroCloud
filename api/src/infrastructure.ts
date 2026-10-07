@@ -1,7 +1,9 @@
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-import { BlobServiceClient, StorageSharedKeyCredential } from '@azure/storage-blob';
 import { PrismaClient } from './generated/prisma/client.js';
 import type { Config } from './config.js';
+import { createStorage } from './local-storage.js';
+
+export { createStorage } from './local-storage.js';
 
 export function createDatabase(config: Pick<Config, 'DATABASE_URL'>) {
   const url = new URL(config.DATABASE_URL);
@@ -20,14 +22,6 @@ export function createDatabase(config: Pick<Config, 'DATABASE_URL'>) {
   return new PrismaClient({ adapter });
 }
 
-export function createStorage(config: Config) {
-  return new BlobServiceClient(
-    config.STORAGE_BLOB_ENDPOINT,
-    new StorageSharedKeyCredential(config.STORAGE_ACCOUNT_NAME, config.STORAGE_ACCOUNT_KEY),
-    { retryOptions: { maxTries: 1, tryTimeoutInMs: 3000 } },
-  );
-}
-
 export function createInfrastructure(config: Config) {
   const database = createDatabase(config);
   const storage = createStorage(config);
@@ -36,12 +30,7 @@ export function createInfrastructure(config: Config) {
     storage,
     checks: {
       database: async () => { await database.$queryRaw`SELECT 1`; },
-      storage: async () => {
-        await Promise.all([
-          storage.getContainerClient(config.STORAGE_CONTAINER_SAVES).getProperties(),
-          storage.getContainerClient(config.STORAGE_CONTAINER_CAPTURES).getProperties(),
-        ]);
-      },
+      storage: () => storage.check(),
     },
     close: () => database.$disconnect(),
   };

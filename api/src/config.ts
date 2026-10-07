@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { z } from 'zod';
 
 export const configSchema = z.object({
@@ -10,18 +11,8 @@ export const configSchema = z.object({
     return url.protocol === 'mysql:' && url.username.length > 0 &&
       url.password.length > 0 && url.pathname.length > 1 && !url.search;
   }, 'Use a MySQL URL with credentials, database and no query parameters'),
-  STORAGE_ACCOUNT_NAME: z.string().regex(/^[a-z0-9]{3,24}$/),
-  STORAGE_ACCOUNT_KEY: z.string().min(32).regex(/^[A-Za-z0-9+/]+={0,2}$/),
-  STORAGE_BLOB_ENDPOINT: z.string().url().refine(value => URL.canParse(value) && ['http:', 'https:'].includes(new URL(value).protocol)),
-  STORAGE_CONTAINER_SAVES: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(3).max(63),
-  STORAGE_CONTAINER_CAPTURES: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(3).max(63),
-}).superRefine((value, ctx) => {
-  if (value.STORAGE_CONTAINER_SAVES === value.STORAGE_CONTAINER_CAPTURES) {
-    ctx.addIssue({ code: 'custom', path: ['STORAGE_CONTAINER_CAPTURES'], message: 'Use separate containers' });
-  }
-  if (value.NODE_ENV === 'production' && !value.STORAGE_BLOB_ENDPOINT.startsWith('https:')) {
-    ctx.addIssue({ code: 'custom', path: ['STORAGE_BLOB_ENDPOINT'], message: 'HTTPS required in production' });
-  }
+  STORAGE_ROOT: z.string().min(1).refine(value => path.isAbsolute(value) && !value.includes('\0'),
+    'Use an absolute local storage directory'),
 });
 
 export type Config = z.infer<typeof configSchema>;

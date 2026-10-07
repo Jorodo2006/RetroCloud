@@ -5,7 +5,7 @@ export function createLogger(level: string) {
     level,
     redact: {
       paths: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-api-key"]',
-        'password', 'passwordHash', 'apiKey', 'DATABASE_URL', 'STORAGE_ACCOUNT_KEY'],
+        'password', 'passwordHash', 'apiKey', 'DATABASE_URL'],
       censor: '[REDACTED]',
     },
   });
