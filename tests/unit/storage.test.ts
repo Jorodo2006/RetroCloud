@@ -1,13 +1,15 @@
 import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LocalStorage, createStorageKey } from '../../api/src/local-storage.js';
 
-const temporaryRoot = path.resolve('.tmp');
-let sandbox: string;
+const temporaryRoot = path.resolve(tmpdir(), 'retro-cloud-unit');
+let sandbox = '';
 let storage: LocalStorage;
 
 beforeEach(async () => {
+  sandbox = '';
   await mkdir(temporaryRoot, { recursive: true });
   sandbox = await mkdtemp(path.join(temporaryRoot, 'storage-test-'));
   storage = new LocalStorage(path.join(sandbox, 'data'));
@@ -15,6 +17,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (!sandbox) return;
   const resolved = path.resolve(sandbox);
   if (path.dirname(resolved) !== temporaryRoot || !path.basename(resolved).startsWith('storage-test-')) {
     throw new Error('Refusing to clean a directory outside the test sandbox');

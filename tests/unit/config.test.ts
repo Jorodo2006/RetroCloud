@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../api/src/config.js';
 
 const valid = {
+  JWT_SECRET: 'a'.repeat(64),
   DATABASE_URL: 'mysql://local:example@localhost:3307/retro_cloud',
   STORAGE_ROOT: path.resolve('data/storage'),
 };
@@ -27,5 +28,22 @@ describe('configuration', () => {
   });
   it.each(['', 'data/storage', 'bad\0path'])('rejects invalid storage root %s', STORAGE_ROOT => {
     expect(() => loadConfig({ ...valid, STORAGE_ROOT })).toThrow('STORAGE_ROOT');
+  });
+});
+
+
+describe('authentication configuration', () => {
+  it('requires a generated JWT secret and a valid exact origin', () => {
+    expect(() => loadConfig({ ...valid, JWT_SECRET: 'short' })).toThrow('JWT_SECRET');
+    for (const APP_ORIGIN of ['not a URL', 'https://example.com/', 'https://example.com/path', 'ftp://example.com']) {
+      expect(() => loadConfig({ ...valid, APP_ORIGIN })).toThrow('APP_ORIGIN');
+    }
+    expect(() => loadConfig({ ...valid, REGISTRATION_MODE: 'anything' })).toThrow('REGISTRATION_MODE');
+    expect(loadConfig(valid).REGISTRATION_MODE).toBe('first-user');
+  });
+  it('requires HTTPS and secure cookies in production', () => {
+    expect(() => loadConfig({ ...valid, NODE_ENV: 'production' })).toThrow('COOKIE_SECURE');
+    expect(loadConfig({ ...valid, NODE_ENV: 'production', APP_ORIGIN: 'https://retro.example', COOKIE_SECURE: 'true' }).COOKIE_SECURE).toBe(true);
+    expect(loadConfig({ ...valid, COOKIE_SECURE: 'false' }).COOKIE_SECURE).toBe(false);
   });
 });

@@ -22,11 +22,13 @@
     "build": "npm run db:generate && tsc -b",
     "typecheck": "npm run db:generate && tsc -b && tsc -p tsconfig.tools.json",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "npm run build && tsx scripts/test-integration.ts",
     "check": "npm run db:validate && npm run typecheck && npm test",
     "dev": "npm run build && node --env-file=.env --import tsx --watch api/src/server.ts",
     "start": "node --env-file=.env api/dist/server.js",
-    "storage:init": "node --env-file=.env --import tsx scripts/init-storage.ts"
+    "storage:init": "node --env-file=.env --import tsx scripts/init-storage.ts",
+    "test:integration:docker": "tsx scripts/test-integration.ts --docker",
+    "test:unit:docker": "docker compose run --rm --no-deps -T api npm test -- --configLoader native --no-cache"
   },
   "devDependencies": {
     "@types/express": "5.0.6",
@@ -44,6 +46,7 @@
   "overrides": {
     "mysql2": "3.24.5",
     "deepmerge-ts": "8.0.2",
-    "mariadb": "3.5.4"
+    "mariadb": "3.5.4",
+    "ip-address": "10.7.3"
   }
 }

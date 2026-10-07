@@ -6,6 +6,10 @@ x-app-env: &app-env
   LOG_LEVEL: ${LOG_LEVEL:-info}
   DATABASE_URL: mysql://${MYSQL_USER:?Run npm run env:init}:${MYSQL_PASSWORD:?Run npm run env:init}@mysql:3306/${MYSQL_DATABASE:?Run npm run env:init}
   STORAGE_ROOT: /data/storage
+  JWT_SECRET: ${JWT_SECRET:?Run npm run env:init}
+  REGISTRATION_MODE: ${REGISTRATION_MODE:-first-user}
+  APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
 
 services:
   mysql:
@@ -30,7 +34,7 @@ services:
 
   migrate:
     build: .
-    image: retro-cloud-local:phase1
+    image: retro-cloud-local:phase2
     command: ["npm", "run", "db:migrate"]
     environment: *app-env
     depends_on:
@@ -39,7 +43,7 @@ services:
     restart: "no"
 
   storage-init:
-    image: retro-cloud-local:phase1
+    image: retro-cloud-local:phase2
     build: .
     command: ["node", "--import", "tsx", "scripts/init-storage.ts"]
     environment: *app-env
@@ -48,7 +52,7 @@ services:
     restart: "no"
 
   api:
-    image: retro-cloud-local:phase1
+    image: retro-cloud-local:phase2
     build: .
     environment: *app-env
     volumes:

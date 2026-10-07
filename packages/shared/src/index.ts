@@ -10,3 +10,6 @@ export const apiErrorSchema = z.object({
 });
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+
+export * from './auth.js';
+export * from './library.js';
