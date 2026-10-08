@@ -1,3 +1,5 @@
+import { playSessionSchema, sessionQuerySchema } from '@retro-cloud/shared';
+import { SessionService } from './sessions/service.js';
 import { Router } from 'express';
 import type { CookieOptions, Request, RequestHandler, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
@@ -97,6 +99,16 @@ export function routes({ database, config }: ApiContext) {
   router.delete('/agent/library/:id', device, async (req, res) => {
     await library.remove(res.locals.device!, idSchema.parse(req.params.id));
     res.sendStatus(204);
+  });
+  const sessions = new SessionService(database);
+  router.post('/agent/sessions', device, async (req, res) => {
+    res.json(await sessions.sync(res.locals.device!, playSessionSchema.parse(req.body)));
+  });
+  router.get('/sessions', user, async (req, res) => {
+    res.json(await sessions.list(res.locals.principal!.userId, sessionQuerySchema.parse(req.query)));
+  });
+  router.get('/stats', user, async (req, res) => {
+    res.json(await sessions.stats(res.locals.principal!.userId, sessionQuerySchema.parse(req.query)));
   });
   return router;
 }
