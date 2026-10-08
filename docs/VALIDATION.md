@@ -102,4 +102,4 @@ Las migraciones 001–003 se conservan intactas y el volumen antiguo no particip
 
 ## Estado al cerrar la fase (8 de octubre)
 
-Docker Desktop no estaba disponible y el intento de iniciarlo no habilitó el motor Linux. Por ello no se pudo ejecutar hoy `docker compose up -d` para actualizar la API en ejecución. La imagen de fase 3 y las suites Windows/Docker indicadas arriba se validaron el 7 de octubre. Cuando Docker esté iniciado, ejecuta `docker compose up -d` y comprueba `/health/ready`. El agente real no se ha arrancado: faltan sus carpetas y credenciales de dispositivo.
+Tras iniciar Docker Desktop, se completó `docker compose up -d` con la imagen retro-cloud-local:phase3. API y MySQL están saludables; migrate y storage-init terminaron con código 0. La petición a `/health/ready` devolvió status ok, database true y storage true. Las suites Windows/Docker indicadas arriba se validaron el 7 de octubre. El agente real no se ha arrancado: faltan sus carpetas y credenciales de dispositivo.
