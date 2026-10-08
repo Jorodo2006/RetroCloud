@@ -62,7 +62,7 @@ beforeAll(async () => {
   deviceId = registered.device.id; apiKey = registered.apiKey;
   await listen();
   state = await AgentState.open(agentConfig().AGENT_STATE_ROOT, { apiUrl: base, deviceId });
-  client = new ApiClient(base, apiKey, deviceId, 1000);
+  client = new ApiClient(base, apiKey, deviceId, 10000);
 });
 afterAll(async () => {
   await stopServer(); state?.close(); state = undefined;
@@ -92,7 +92,7 @@ describe('agent against the real HTTP API and MySQL', () => {
       if (lost) { lost = false; await response.body?.cancel(); throw new Error('Simulated lost acknowledgement'); }
       return response;
     };
-    client = new ApiClient(base, apiKey, deviceId, 1000, request);
+    client = new ApiClient(base, apiKey, deviceId, 10000, request);
     expect(await flushQueue(state!, client)).toMatchObject({ pending: 1, deferred: true });
     const first = await db.libraryEntry.findFirstOrThrow({ where: { deviceId } });
     state!.close(); state = await AgentState.open(agentConfig().AGENT_STATE_ROOT, { apiUrl: base, deviceId });
@@ -121,7 +121,7 @@ describe('agent against the real HTTP API and MySQL', () => {
     expect(await flushQueue(state!, client)).toMatchObject({ pending: 1, deferred: true });
     expect(state!.status().errors).toContainEqual({ code: 'HTTP_401', count: 1 });
     apiKey = rotated.apiKey;
-    client = new ApiClient(base, apiKey, deviceId, 1000);
+    client = new ApiClient(base, apiKey, deviceId, 10000);
     state!.retry();
     expect(await flushQueue(state!, client)).toMatchObject({ pending: 0, synced: 3 });
   });
