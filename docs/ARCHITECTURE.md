@@ -203,3 +203,9 @@ El proceso ofrece scan, once, run, sync, status y retry. La demo sintética no n
 El perfil Compose agent monta ROMs/configuración en solo lectura y usa agent-data para SQLite, como node.
 Windows y Docker tienen estados separados; se utiliza un modo por dispositivo. El agente no inspecciona
 procesos del emulador, almacenamiento del navegador ni saves en esta fase. Ver [guía del agente](../agent/README.md).
+
+## Sesiones (fase 4 provisional)
+
+La API reutiliza PlaySession y sus restricciones SQL sin migración adicional. POST /agent/sessions recibe una instantánea abierta o cerrada; el dispositivo autenticado determina el usuario. El juego debe estar en su biblioteca, incluyendo bajas históricas. El par dispositivo/clientSessionId identifica la partida. El bloqueo de la fila del dispositivo serializa reenvíos y revocaciones; el inicio y el resultado cerrado son inmutables. Un inicio retrasado no reabre la sesión.
+
+GET /sessions devuelve historial privado paginado; GET /stats agrega sesiones cerradas y cuenta abiertas por separado. Las consultas usan transacciones para mantener coherencia entre totales y páginas. Las fechas filtran el inicio y las duraciones no se recortan al rango. No hay cierre automático, heartbeat ni conexión EmulatorJS implementada; el agente actual solo sincroniza biblioteca. Véase [SESSIONS.md](SESSIONS.md).

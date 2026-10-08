@@ -147,3 +147,8 @@ y códigos de error; no cuerpos, cookies o tokens.
 Esta fase no incluye recuperación/cambio de contraseña, verificación de correo, gestión de roles,
 limpieza automática de sesiones vencidas, frontend, agente ni transferencias de saves.
 Los tokens usados se conservan para detectar replays mientras su sesión siga siendo válida.
+
+## Sesiones y estadísticas (fase 4 provisional)
+
+POST /agent/sessions con API key; GET /sessions y GET /stats con JWT del propietario.
+Contrato, reenvíos, filtros y ejemplos en [SESSIONS.md](SESSIONS.md).

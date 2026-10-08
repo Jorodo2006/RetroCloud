@@ -8,6 +8,8 @@ Biblioteca de metadatos, sesiones, partidas versionadas y logros para Retro Mach
 Fases 1–3: monorepo TypeScript estricto, MySQL con migraciones, almacenamiento local,
 autenticación de usuarios, dispositivos con claves revocables y biblioteca privada de metadatos.
 `agent/` ya escanea carpetas locales, calcula SHA-256 y sincroniza metadatos con cola persistente.
+Fase 4 provisional: API de sesiones idempotentes, historial y estadísticas; ver [SESSIONS.md](docs/SESSIONS.md).
+La detección en EmulatorJS y la cola de sesiones siguen pendientes.
 `web/` sigue reservado. La conexión con Retro Machine del otro PC queda pendiente.
 
 No se necesita una cuenta cloud. La instalación inicial descarga dependencias e imágenes;
@@ -159,7 +161,7 @@ Se comprobó que no contenía archivos ni versiones de partidas al hacer este ca
 
 ## Pendiente
 
-Fase 4: sesiones de juego. Antes de conectarlas habrá que revisar cómo ejecuta juegos
+Fase 4: queda la detección real y el envío persistente de sesiones. Antes de conectarlos habrá que revisar cómo ejecuta juegos
 Retro Machine y cómo proporciona eventos desde la web. Después: saves, portal e integraciones opcionales. La fase 9 será despliegue en tu propio equipo y CI opcional.
 Antes de exponer la API a otros dispositivos habrá que configurar acceso de red, HTTPS
 y copias de seguridad. Actualmente solo escucha en loopback del host.

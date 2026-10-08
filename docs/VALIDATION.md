@@ -1,4 +1,26 @@
-# Validación — fase 3
+# Validación — fase 4 provisional
+
+Fecha: 8 de octubre de 2026 (Europe/Madrid).
+
+- TypeScript estricto y validación Prisma: correctos.
+- Pruebas unitarias Windows y Linux/Docker: 100/100 en cada plataforma.
+- Integración Linux/Docker con MySQL aislado: 37/37, incluidas 9 pruebas de sesiones.
+- Integración Windows con MySQL aislado: 37/37 tras ajustar los márgenes de preparación y HTTP.
+- Imagen retro-cloud-local:phase4 construida y arrancada; API/MySQL saludables, inicializadores con salida 0.
+- HTTP en 127.0.0.1:3000: /health/ready devuelve 200 con database/storage true; /sessions y /stats sin JWT devuelven 401.
+- Base real: 0 usuarios, primera cuenta disponible, 18 consolas y 0 versiones de saves.
+- Sin cambios de dependencias ni migraciones.
+
+Las nuevas pruebas cubren validación de fechas/duración, reenvíos, cierre anterior al inicio, concurrencia, conflictos, biblioteca del dispositivo, privacidad, filtros y agregación.
+
+Las primeras ejecuciones Windows agotaron el límite de preparación de 15 segundos en fixtures anteriores y nuevos. Una petición real del agente también superó su margen de un segundo, causando fallos posteriores. Se amplió el margen de integración a 60 segundos de preparación, 30 por prueba y 10 para HTTP del agente de prueba. Los límites de producción no cambiaron. Las pruebas Linux anteriores pasaron con los márgenes originales.
+
+El alcance aprobado cubre la API y sesiones simuladas. Detección EmulatorJS, heartbeat, cola de sesiones del productor y recuperación de cierres del navegador quedan pendientes de revisar Retro Machine.
+
+La comprobación Node de localhost recibió HTML inesperado en este equipo; la dirección IPv4 publicada por Compose, 127.0.0.1:3000, devolvió las respuestas correctas. No se cambió la configuración de red del equipo.
+
+## Historial de validación de fase 3
+
 
 Pruebas: 7 de octubre de 2026 (Europe/Madrid). Cierre documental: 8 de octubre.
 

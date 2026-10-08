@@ -34,7 +34,7 @@ services:
 
   migrate:
     build: .
-    image: retro-cloud-local:phase3
+    image: retro-cloud-local:phase4
     command: ["npm", "run", "db:migrate"]
     environment: *app-env
     depends_on:
@@ -43,7 +43,7 @@ services:
     restart: "no"
 
   storage-init:
-    image: retro-cloud-local:phase3
+    image: retro-cloud-local:phase4
     build: .
     command: ["node", "--import", "tsx", "scripts/init-storage.ts"]
     environment: *app-env
@@ -52,7 +52,7 @@ services:
     restart: "no"
 
   api:
-    image: retro-cloud-local:phase3
+    image: retro-cloud-local:phase4
     build: .
     environment: *app-env
     volumes:
@@ -73,7 +73,7 @@ services:
       start_period: 10s
 
   agent:
-    image: retro-cloud-local:phase3
+    image: retro-cloud-local:phase4
     build: .
     profiles: ["agent"]
     command: ["node", "agent/dist/main.js", "run"]
