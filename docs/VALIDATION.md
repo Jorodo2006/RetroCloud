@@ -1,6 +1,6 @@
-# Validación — fase 2
+# Validación — fase 3
 
-Fecha: 7 de octubre de 2026 (Europe/Madrid).
+Pruebas: 7 de octubre de 2026 (Europe/Madrid). Cierre documental: 8 de octubre.
 
 ## Entorno
 
@@ -13,11 +13,11 @@ API y pruebas Docker ejecutadas como node (uid 1000), sin root.
 | Comprobación | Resultado |
 | --- | --- |
 | Validación Prisma y TypeScript estricto | Correctas |
-| Construcción de imagen retro-cloud-local:phase2 | Correcta |
-| Pruebas unitarias Windows | 56/56 |
-| Pruebas unitarias Linux/Docker | 56/56 |
-| Integración Windows con MySQL real | 24/24 |
-| Integración Linux/Docker con MySQL real | 24/24 |
+| Construcción de imagen retro-cloud-local:phase3 | Correcta |
+| Pruebas unitarias Windows | 89/89 |
+| Pruebas unitarias Linux/Docker | 89/89 |
+| Integración Windows con MySQL real | 28/28 |
+| Integración Linux/Docker con MySQL real | 28/28 |
 | Migración 004 en bases temporales desde cero | Correcta en ambas plataformas |
 | Migración 004 sobre la base local existente | Aplicada; cuatro migraciones al día |
 | Comparación de MySQL con db/schema.prisma | Sin diferencias |
@@ -34,7 +34,19 @@ nativo, caché desactivada en Docker y archivos de prueba en la carpeta temporal
 La prueba que realiza varias derivaciones scrypt tiene 15 segundos de margen para equipos
 con carga; no se redujeron los parámetros de seguridad de las contraseñas.
 
-## Cobertura
+## Cobertura añadida en fase 3
+
+- SHA-256 por bloques, cambios durante lectura, archivos vacíos y cancelación.
+- Escaneo recursivo, filtros, caché, duplicados y rechazo de enlaces o rutas inseguras.
+- Cola SQLite persistente, bloqueo de instancia, vinculación a dispositivo y confirmaciones por revisión.
+- Reintentos automáticos tras desconexión/reinicio, backoff, Retry-After y aislamiento de elementos inválidos.
+- Respuesta perdida después de confirmar en MySQL: reenvío sin duplicados.
+- Rotación de API key y ejecución real del CLI compilado.
+- Demo sintética en Windows y escaneo mediante el perfil Docker opcional; montajes de ROMs y configuración comprobados como solo lectura.
+
+No se añadieron migraciones MySQL en esta fase. Las comprobaciones de salud, esquema y base real de la tabla se verificaron durante la fase 2; las suites completas y la imagen se verificaron de nuevo en fase 3.
+
+## Cobertura anterior
 
 - Contraseñas con sal independiente; verificación correcta, incorrecta y de usuario inexistente.
 - JWT: firma, emisor, audiencia, algoritmo, caducidad y sesión obligatoria.
@@ -74,7 +86,7 @@ Los ejemplos para utilizar los endpoints y crear la primera cuenta están en [AP
 
 ## Pendiente de otras fases
 
-Agente, escaneo real de ROMs, cola offline, sesiones de juego, sincronización/versionado de saves,
+Integración con las carpetas reales de Retro Machine, sesiones de juego, sincronización/versionado de saves,
 resolución de conflictos, portal e integraciones opcionales. No se ha inspeccionado Retro Machine,
 que sigue en otro PC. No hay recuperación/cambio de contraseña, correo, limpieza automática de
 sesiones caducadas, despliegue LAN/HTTPS ni simulacro completo de backup/restauración.
@@ -87,3 +99,7 @@ El límite de peticiones usa memoria de un proceso y se reinicia con la API.
 La sustitución de Azurite se validó con 33 pruebas unitarias y 7 de integración en ambas plataformas.
 Se comprobó persistencia tras reiniciar la API y ausencia de archivos/versiones reales que trasladar.
 Las migraciones 001–003 se conservan intactas y el volumen antiguo no participa en Compose.
+
+## Estado al cerrar la fase (8 de octubre)
+
+Docker Desktop no estaba disponible y el intento de iniciarlo no habilitó el motor Linux. Por ello no se pudo ejecutar hoy `docker compose up -d` para actualizar la API en ejecución. La imagen de fase 3 y las suites Windows/Docker indicadas arriba se validaron el 7 de octubre. Cuando Docker esté iniciado, ejecuta `docker compose up -d` y comprueba `/health/ready`. El agente real no se ha arrancado: faltan sus carpetas y credenciales de dispositivo.

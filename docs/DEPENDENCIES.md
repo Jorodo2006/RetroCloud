@@ -31,3 +31,9 @@ Las contraseñas utilizan scrypt de node:crypto, sin binarios nativos adicionale
 Referencias primarias: [jose](https://github.com/panva/jose),
 [Node crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html),
 [express-rate-limit](https://express-rate-limit.mintlify.app/reference/configuration).
+
+## Agente
+
+Reutiliza Zod, Pino y los contratos compartidos. Hashes y cola usan node:crypto y node:sqlite
+incluidos en Node 24.14; no se añade ningún servicio cloud ni dependencia nativa externa.
+node:sqlite es experimental en esa versión y emite su aviso estándar.

@@ -41,3 +41,9 @@ que correspondan y comprueba /health/ready.
 La restauración no se ejecuta automáticamente. Un simulacro completo de recuperación y la
 automatización de backups forman parte del futuro despliegue autohospedado.
 Nunca uses docker compose down -v como parte de una copia: elimina los volúmenes.
+
+## Estado local del agente (fase 3)
+
+El backup anterior de MySQL y storage no incluye la cola offline del agente. Detén el agente antes de copiar su estado: en Windows, copia toda AGENT_STATE_ROOT; en Docker, conserva el volumen agent-data completo con el servicio agent detenido. Incluye los archivos SQLite auxiliares si existen. Conserva también la configuración de carpetas y el .env de forma privada.
+
+Restaura el estado con el agente detenido y para el mismo origen de API e id de dispositivo. La clave puede rotarse sin cambiar esa vinculación. Windows y Docker usan estados separados. No se ha realizado un simulacro completo de restauración de estos backups.

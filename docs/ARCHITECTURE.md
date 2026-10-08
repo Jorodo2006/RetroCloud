@@ -13,7 +13,8 @@
 ## Integración con Retro Machine pendiente
 
 El código está en otro PC y aún no se ha verificado dónde se ejecuta la emulación.
-`agent/` permanece sin lógica. Si la emulación es nativa se estudiarán procesos y carpetas;
+`agent/` ya permite escaneo de carpetas locales accesibles por Node. La conexión real sigue pendiente.
+Si la emulación es nativa se estudiarán procesos y carpetas;
 si está en el navegador se integrarán eventos y almacenamiento del emulador.
 El esquema de nube no contiene rutas locales ni ROMs. Un dispositivo representa una instalación
 registrada; no se incrustarán claves de servidor en frontends públicos.
@@ -24,6 +25,9 @@ registrada; no se incrustarán claves de servidor en frontends públicos.
 flowchart LR
   RM["Retro Machine · integración pendiente"] -.-> API["API Express"]
   WEB["Portal · fase 6"] -.-> API
+  ROMS["Carpetas ROM locales · solo lectura"] --> AGENT["Agente Node.js"]
+  AGENT --> QUEUE[("SQLite local: caché y cola")]
+  AGENT -->|"Solo metadatos"| API
   API --> DB[("MySQL local")]
   API --> FILES[("Volumen local: saves y capturas")]
   MIG["Migraciones explícitas"] --> DB
@@ -31,7 +35,8 @@ flowchart LR
 
 - `api/`: HTTP, configuración, base de datos y adaptador de disco.
 - `packages/shared/`: contratos Zod sin secretos ni Prisma.
-- `agent/` y `web/`: workspaces reservados.
+- `agent/`: escáner local, caché, cola SQLite persistente y cliente HTTP por dispositivo.
+- `web/`: workspace reservado para el portal.
 - `db/`: esquema y migraciones.
 - `scripts/`: generación de entorno e inicialización de almacenamiento.
 - `tests/`: validación unitaria y contra infraestructura real.
@@ -169,3 +174,32 @@ scripts/test-integration.ts crea una base MySQL aleatoria retro_test_*, concede 
 al usuario de desarrollo y aplica todas las migraciones. Ejecuta los tests en Windows o en un contenedor
 Linux sin privilegios, con directorio temporal de archivos y secreto JWT aleatorio. Al terminar elimina
 base, permisos y archivos. La suite de auth exige ese entorno aislado: sus altas no cierran el registro real.
+
+## Agente provisional — fase 3
+
+La configuración separa una raíz local y un JSON de subcarpetas/consolas/extensiones. Node lee archivos
+por bloques de 1 MiB; SHA-256 identifica bytes exactos y no supone identificación canónica ni hashes RA.
+Las rutas se mantienen locales. Solo se transmiten los campos estrictos admitidos por /agent/library.
+Se comprueba identidad, tamaño y timestamps del archivo antes/después; los enlaces interiores se omiten
+y las raíces enlazadas se rechazan. La caché reutiliza el hash solo con firma de metadatos sin cambios.
+
+Un escaneo completo guarda caché y observaciones en una transacción SQLite. Las entradas de cola se
+identifican por fingerprint y llevan revisión, estado, intentos y fecha del próximo intento. La confirmación
+incluye la revisión para no dar por enviada una observación posterior. Los metadatos ya sincronizados
+no se reenvían sin cambios. Las ausencias no generan bajas remotas en esta integración provisional.
+
+SQLite usa WAL y synchronous=FULL; un segundo archivo mantiene un bloqueo exclusivo por proceso.
+Cerrar o terminar el proceso libera ese bloqueo mediante SQLite, sin archivos PID que haya que borrar.
+El estado se vincula a origen de API y deviceId, no a la clave: una rotación permite continuar la misma cola.
+Se rechazan versiones de esquema local desconocidas; la versión inicial es 1. No cambia el esquema MySQL.
+node:sqlite viene con Node 24.14, todavía experimental; se valida en Windows y en la imagen Linux fijada.
+
+El cliente no sigue redirecciones, limita tiempo y tamaño de respuesta y valida cada confirmación.
+Usa lotes de hasta 50 elementos y 28 KiB UTF-8. Fallos transitorios generan backoff persistente con jitter;
+401/403/404 pausan la conexión y errores permanentes separan el lote hasta aislar elementos bloqueados.
+La API mantiene la idempotencia si hubo commit remoto y se perdió la respuesta.
+
+El proceso ofrece scan, once, run, sync, status y retry. La demo sintética no necesita credenciales ni red.
+El perfil Compose agent monta ROMs/configuración en solo lectura y usa agent-data para SQLite, como node.
+Windows y Docker tienen estados separados; se utiliza un modo por dispositivo. El agente no inspecciona
+procesos del emulador, almacenamiento del navegador ni saves en esta fase. Ver [guía del agente](../agent/README.md).

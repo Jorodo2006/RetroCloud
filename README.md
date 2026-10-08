@@ -5,10 +5,10 @@ Biblioteca de metadatos, sesiones, partidas versionadas y logros para Retro Mach
 
 ## Estado
 
-Fases 1 y 2: monorepo TypeScript estricto, MySQL con migraciones, almacenamiento local,
+Fases 1–3: monorepo TypeScript estricto, MySQL con migraciones, almacenamiento local,
 autenticación de usuarios, dispositivos con claves revocables y biblioteca privada de metadatos.
-`agent/` y `web/` siguen reservados para sus fases. Retro Machine está en otro PC y falta
-revisar cómo ejecuta sus emuladores.
+`agent/` ya escanea carpetas locales, calcula SHA-256 y sincroniza metadatos con cola persistente.
+`web/` sigue reservado. La conexión con Retro Machine del otro PC queda pendiente.
 
 No se necesita una cuenta cloud. La instalación inicial descarga dependencias e imágenes;
 una vez instaladas, los servicios locales funcionan sin Internet.
@@ -62,8 +62,21 @@ El indicador se conserva en MySQL. Las pruebas usan otra base y no consumen tu p
 Si cambias el puerto de API, ajusta APP_ORIGIN. El portal futuro usará el mismo origen
 o un proxy de desarrollo; no hay CORS habilitado.
 
+## Agente local: prueba sin ROMs ni cuenta
+
+```powershell
+npm run build
+npm run agent:demo
+```
+
+La demo escanea un archivo sintético y no hace peticiones de red. Para configurar tus carpetas,
+credenciales, comandos y el perfil Docker opcional, consulta [agent/README.md](agent/README.md).
+El agente lee los ROMs por bloques y envía solo metadatos; conserva la cola durante desconexiones
+y reinicios. En este alcance provisional no elimina entradas remotas al desaparecer archivos.
+
 ## Dónde se guarda todo
 
+- Estado del agente: AGENT_STATE_ROOT en Windows; volumen `retro-cloud_agent-data` en Docker.
 - MySQL: volumen Docker `retro-cloud_mysql-data`.
 - Saves y capturas en Docker: volumen `retro-cloud_storage-data`, montado en `/data/storage`.
 - API ejecutada directamente en Windows: la carpeta absoluta indicada por `STORAGE_ROOT`;
@@ -146,8 +159,8 @@ Se comprobó que no contenía archivos ni versiones de partidas al hacer este ca
 
 ## Pendiente
 
-Fase 3: agente, escaneo y envío de biblioteca, tras revisar la integración con Retro Machine.
-Después: sesiones, sincronización de saves, portal e integraciones opcionales. La fase 9 será despliegue en tu propio equipo y CI opcional.
+Fase 4: sesiones de juego. Antes de conectarlas habrá que revisar cómo ejecuta juegos
+Retro Machine y cómo proporciona eventos desde la web. Después: saves, portal e integraciones opcionales. La fase 9 será despliegue en tu propio equipo y CI opcional.
 Antes de exponer la API a otros dispositivos habrá que configurar acceso de red, HTTPS
 y copias de seguridad. Actualmente solo escucha en loopback del host.
 
