@@ -13,3 +13,5 @@ coverage
 
 data/
 backups/
+
+agent/library.json

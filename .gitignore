@@ -16,3 +16,5 @@ api/src/generated/
 
 data/
 backups/
+
+agent/library.json

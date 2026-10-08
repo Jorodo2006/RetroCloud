@@ -34,7 +34,7 @@ services:
 
   migrate:
     build: .
-    image: retro-cloud-local:phase2
+    image: retro-cloud-local:phase3
     command: ["npm", "run", "db:migrate"]
     environment: *app-env
     depends_on:
@@ -43,7 +43,7 @@ services:
     restart: "no"
 
   storage-init:
-    image: retro-cloud-local:phase2
+    image: retro-cloud-local:phase3
     build: .
     command: ["node", "--import", "tsx", "scripts/init-storage.ts"]
     environment: *app-env
@@ -52,7 +52,7 @@ services:
     restart: "no"
 
   api:
-    image: retro-cloud-local:phase2
+    image: retro-cloud-local:phase3
     build: .
     environment: *app-env
     volumes:
@@ -72,6 +72,43 @@ services:
       retries: 5
       start_period: 10s
 
+  agent:
+    image: retro-cloud-local:phase3
+    build: .
+    profiles: ["agent"]
+    command: ["node", "agent/dist/main.js", "run"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AGENT_API_URL: http://api:3000
+      AGENT_API_KEY: ${AGENT_API_KEY:-}
+      AGENT_DEVICE_ID: ${AGENT_DEVICE_ID:-}
+      AGENT_ROMS_ROOT: /roms
+      AGENT_STATE_ROOT: /data/agent
+      AGENT_LIBRARY_CONFIG: /config/library.json
+      AGENT_SCAN_INTERVAL_SECONDS: ${AGENT_SCAN_INTERVAL_SECONDS:-300}
+      AGENT_REQUEST_TIMEOUT_SECONDS: ${AGENT_REQUEST_TIMEOUT_SECONDS:-15}
+      AGENT_MAX_FILES: ${AGENT_MAX_FILES:-100000}
+    volumes:
+      - type: bind
+        source: ${AGENT_ROMS_ROOT:-./data/roms}
+        target: /roms
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AGENT_LIBRARY_CONFIG:-./agent/library.example.json}
+        target: /config/library.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - agent-data:/data/agent
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
 volumes:
   mysql-data:
   storage-data:
+  agent-data:

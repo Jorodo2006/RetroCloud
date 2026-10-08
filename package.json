@@ -28,7 +28,14 @@
     "start": "node --env-file=.env api/dist/server.js",
     "storage:init": "node --env-file=.env --import tsx scripts/init-storage.ts",
     "test:integration:docker": "tsx scripts/test-integration.ts --docker",
-    "test:unit:docker": "docker compose run --rm --no-deps -T api npm test -- --configLoader native --no-cache"
+    "test:unit:docker": "docker compose run --rm --no-deps -T api npm test -- --configLoader native --no-cache",
+    "agent:scan": "node --env-file=.env agent/dist/main.js scan",
+    "agent:once": "node --env-file=.env agent/dist/main.js once",
+    "agent:sync": "node --env-file=.env agent/dist/main.js sync",
+    "agent:status": "node --env-file=.env agent/dist/main.js status",
+    "agent:retry": "node --env-file=.env agent/dist/main.js retry",
+    "agent:start": "node --env-file=.env agent/dist/main.js run",
+    "agent:demo": "tsx scripts/agent-demo.ts"
   },
   "devDependencies": {
     "@types/express": "5.0.6",
